@@ -11,6 +11,8 @@ class cell_card:
         self.cells={}
         self.cells_indexs_in_raw_data=[]
         #self.cells_indexs_in_raw_data2=[]
+        
+        self.__look_for_index = []
         pass
     def parse(self, lines:list[str]):
         self.raw_data = lines
@@ -36,24 +38,44 @@ class cell_card:
             self.cells[tmp_cell.id]=tmp_cell
         return self
     
-    def search_for(self,**kwd):
+    def look_for(self,paramters={},**kwd):
         INDEX=[]
         for c_id,cell in self.cells.items():
-            case = []
-            for ky,val in kwd.items():
-                if ky in cell_options().__keys__:
-                    if cell.options.__dict__[ky].value==val:
-                        case.append(True)
+            STAT = []
+            for Case in [paramters,kwd]:
+                for ky,val in Case.items():
+                    if sum([ky.find(x)>=0 for x in cell_options().__keys__]):# ky in cell_options().__keys__:
+                        #print(ky,val)
+                        STAT.append(cell.options.has_value({ky:val}))
+                    elif ky.lower() in ["mat_id","material_id"]:
+                        STAT.append(cell.material_id==val)
+                    elif ky.lower() in ["rho","material_density","density"]  :
+                        STAT.append(cell.material_density==val)
+                    elif ky.lower() in ["surface","surf"]:
+                        print("Search for surface has not been developed yet!")
+                    elif ky.lower() in ["cell"]:
+                        print("Search for cell has not been developed yet!")
                     else:
-                        case.append(False)
-                elif ky.lower() in ["mat_id","material_id"]:
-                    case.append(cell.material_id==val)
-                elif ky.lower() in ["rho","material_density","density"]  :
-                    case.append(cell.material_density==val)
-            if all(case):
+                        Warning(f" [{ky}] paramter is not supported!")
+                        
+            if all(STAT):
                 INDEX.append(c_id)
+        self.__look_for_index=INDEX 
         return INDEX
-
+    
+    def __getitem__(self,index):
+        if isinstance(index, (list,tuple,set)):
+            return [self[i] for i in index]
+        elif isinstance(index, int):
+            return self.cells[index]
+        elif isinstance(index, slice):
+            I=list(range(len(self.cells)))
+            return self[I[index]]
+        else:
+            Warning(f"[{type(index)}][index] is not supported!")
+            return 
+    def __repr__(self):
+        return "Not Yet Cell Card"
             
             
 
@@ -61,28 +83,94 @@ class _general_option:
     def __init__(self):
         self.value = None
         self.key = None
-    def parse(self,opt):
-        tmp=opt.split("=")
+        self.raw_data = []
+    def parse(self,opt,vals):
+        if opt!=self.key:
+            Warning(f"Wrong mcnp option {opt} <--> {self.key}")
+        #tmp=opt.split("=")
+        self.raw_data = vals
         conveter = float
-        if self.key in ["u","lat","fill"]:
+        if self.key in ["u","lat"]:
             conveter=int
-        self.value = str2num(tmp[1],conveter).convert()
-        pass
+            self.value = str2num(vals,conveter).convert()[0]
+        elif self.key in ["vol","tmp"]:
+            self.value = str2num(vals,conveter).convert()[0]
+            pass
+        else:
+            print(f"{self.key} hasn not been developed yet!")
+        return self.check()
+    def check(self):
+        return self
     def __str__(self):
         if self.value is not None:
             return f"{self.key}={self.value}".upper()
         return ""
-    pass
+    
+    #@property
+    def __call__(self):
+        return self.value
+    
+    def __repr__(self):
+        return str(self)
+    def has_value(self,*arg):
+        if len(arg)==2:
+            if arg[0].find(self.key)<0:
+                return False
+            return arg[1]==self.value
+        elif len(arg)==1:
+            return arg[0]==self.value
+        return False
 
+            
 class _universe(_general_option):
     def __init__(self):
         super().__init__()
         self.key="u"
-
+    def check(self):
+        return isinstance(self.value, int)
     
 class _importance:
-    def parse(self,opt):
-        pass
+    _particles = dict(n="neutron",
+                      p="photon",
+                      e="electron",
+                      h="hydron")
+    def __init__(self):
+        super().__init__()
+        self.key="imp"
+    def parse(self,opt,val):
+        print(opt)
+        particles = opt.lower().split("imp:")[1].split(",")
+        print(particles)
+        if len(val)!=1:
+            Warning("Warning in Importance option")
+        for p in particles:
+            if str2num(val[0],int).IsType():
+                self.__dict__[p]=str2num(val[0],int).convert()
+            elif str2num(val[0],float).IsType():
+                self.__dict__[p]=str2num(val[0],float).convert()
+            else:
+                self.__dict__[p]=val[0]
+        self.check()
+        return self
+    def check(self):
+        return all([isinstance(v, (int,float)) for v in 
+                    [val for a,val in self.__dict__.items() if a in self._particles
+            ]])
+    
+    def has_value(self,*arg):
+        if len(arg)==1:
+            return all([x==val for x in [xx for p,xx in self.__dict__.items() if p in self._particles]])
+        if len(arg)==2:
+            particles = arg[0].lower().split("imp:")[1].split(",")
+            STAT=[]
+            for p in particles:
+                if p not in self.__dict__ or p not in self._particles:
+                    return False
+                STAT.append(self.__dict__[p] ==arg[1])
+            return all(STAT)
+        else:
+            return False
+                    
 
 class _volume(_general_option):
     def __init__(self):
@@ -94,20 +182,39 @@ class _temperature(_general_option):
     def __init__(self):
         super().__init__()
         self.key="tmp"
+    def convert_to_K(self):
+        k=1
+        return self.value*k
 
 class _latice(_general_option):
     def __init__(self):
         super().__init__()
         self.key="lat"
+    def check(self):
+        if self.value in [1,2]:
+            return True
+        return False
 
 class _fill(_general_option):
     def __init__(self):
         super().__init__()
         self.key="fill"
+    def parse(self,opt,val):
+        self.raw_data = val
+        if len(val)==1:
+            self.value = str2num(val,int).convert()[0]
+        else:
+            Warning("Fill matrix has not been supported yet")
+        return self
+    def check(self):
+        Warning("Check Fill has not been developed yet!")
+        return True
+    
+    
 
-class _translation:
-    def parse(self,opt):
-        pass
+class _translation(_general_option):
+    pass
+
     
 cell_option_keys = dict(u=_universe(),
                 imp=_importance(),
@@ -147,32 +254,19 @@ class cell:
             else:
                 FULL_STR+=line
         
-            
         # REMOVE DOUBLE BLANK
         while (FULL_STR.find("  ")>=0):
             FULL_STR = FULL_STR.replace("  "," ")
             pass
-        # for char,_ in cell_option_keys.items():
-        #     if FULL_STR.find(char)>=0 and char!="imp":
-        #         if FULL_STR.find(f"{char}=")<0:
-        #             FULL_STR=FULL_STR.replace(char,f"{char}=")                    
-        #             print("Bingo",FULL_STR)
-        #             #exit()
-        #     elif FULL_STR.find(char)>=0 and char!="imp":
-                
-                
-
                     
         # Adjust some blanks
         for char,val in {"&":" ", "=":"= "}.items():
             FULL_STR = FULL_STR.replace(char,val).lower()
         
-
-        
         # Start Processing the string
         tmp=Split_txt(FULL_STR)
-        print("FULL:",FULL_STR)
-        print(tmp)
+        # print("FULL:",FULL_STR)
+        # print(tmp)
         
         # Get Cell ID
         self.id = str2num(tmp[0],int).convert()
@@ -182,7 +276,7 @@ class cell:
             pass
         # Get Material information
         self.material_id = str2num(tmp[1],int).convert()
-        
+    
         ## search for geomtery information
         cell_i_start = 2
         if self.material_id>0:
@@ -206,7 +300,14 @@ class cell:
         self.options.parse(tmp[cell_i_end+1:])
         
         return self
-
+    
+    def __repr__(self):
+        return f"""
+    ID       : {self.id}
+    Mat ID   : {self.material_id}
+    RHO      : {self.material_density}
+    OPTIONS  : {str(self.options)}
+    """
         
         
         
@@ -217,138 +318,73 @@ class cell_geomtery:
     
 from copy import deepcopy
 class cell_options:
+    # *************************************************************************
+    def _search_in(self,item,list_items):
+        """
+        This function is used to check if an string my have char(s) in list
+        """
+        for i in list_items:
+            if item.find(i)>=0:
+                return i
+        return 
+    
+    
     __keys__ = cell_option_keys
+    
     def __init__(self):
         for k,val in self.__keys__.items():
             self.__dict__[k]=deepcopy(val)
         self.raw_data = []
     def parse(self,str_arr=[str]):
-        self.raw_data = str_arr
-        #print(self.raw_data)
-        #self.value = lines[0]
-        indexes = {}
-        KEYS=list(self.__keys__.keys())
-        
-        
-        KK = {}
-        
-        for ky1 in KEYS:
-            KK[ky1]=[]
-            for i,item in enumerate(self.raw_data):
-                if item.find(ky1)>=0:
-                    for j,item2 in enumerate(self.raw_data[i+1:]):
-                        STOP=False
-                        for ky2 in KEYS:
-                            if ky1==ky2:
-                                print("Musebah")
-                                continue
-                            if item2.find(ky2)>=0:
-                                STOP=True
-                            if STOP:
-                                break
-                            
-                        if STOP:
-                            STOP
-                        KK[ky1].append(j+i+1)
-        print(KK)
-        while j<len(self.raw_data):
-            txt = self.raw_data[j]
-            for ky in KEYS:
-                if ky in KK:
-                    print("SHI",k,ky)
+        search_in =self._search_in
+        def fix_array(x:list[str]):
+            A=[]
+            for xx in x:
+                if xx.find("=")>=0:
+                    for xxx in xx.split("="):
+                        if xxx!="":
+                            A.append(xxx.strip())
                     continue
-                if txt.find(ky)>=0:
-                    KK[ky]=[j+1]
-                    j+=1
-                    while j<len(self.raw_data):
-                        txt2 = self.raw_data[j]
-                        for ky2 in KEYS:
-                            if txt2.find(ky2)>=0:
-                                print("SH2",j)
-                                break
-                        KK[ky].append(j+1)
-                        j+=1
-            j+=1
-            print(KK)
+                A.append(xx.strip())
+            return A
+
+        self.raw_data = str_arr
+        KEYS=list(self.__keys__.keys())        
+        opt_array = fix_array(self.raw_data)
+        indexes= {}
+        #
+        for i,item in enumerate(opt_array):
+            ky = search_in(item,KEYS)
+            if ky is None:
+                continue
+            indexes[item]=[]
+            for j,item2 in enumerate(opt_array[i:]):
+                if item2.find(ky)>=0:
+                    continue
+                tmp_k=search_in(item2,KEYS)
+                if tmp_k is None:
+                    indexes[item].append(item2)
+                else:
+                    break
         
-        
-        for i,ky in enumerate(KEYS):
-            j=0
-            #print(i,ky)
-            start = None
-            end   = None
-            KEYS_min_ky = [k for k in KEYS if k!=ky]
-            while j<len(self.raw_data):
-                txt=self.raw_data[j]
-                if txt.find(ky)>=0:
-                    start=j+1 
-                j+=1
-                for ky2 in KEYS_min_ky:
-                    while j<len(self.raw_data):
-                        txt=self.raw_data[j]
-                        if txt.find(ky2)>=0:
-                            end = j
-                            break
-                        j+=1
-                    if end is not None:
-                        break
-            
-            if all([x is not None for x in [start,end]]):
-                print(ky,"START<END:",start,end)
-                    
-                        
-            # for j,val in enumerate(self.raw_data):
-            #     if val.find(ky)>=0:
-            #         print("bingo1")
-            #         start = j+1
-            #         end = start+1
-            #         for k,val2 in enumerate(self.raw_data[j+1:]):
-            #             breakthis = False
-            #             for l,ky2 in enumerate(KEYS):
-            #                 if l==i:
-            #                     print("Bingo: CONTINUE!")
-            #                     continue
-            #                 if val2.find(ky2)>=0:
-            #                     print("START,END",start,k,ky,ky2)
-            #                     end=k
-            #                     breakthis = True
-            #                     break
-            #             if breakthis:
-            #                 break
-            # if start is not None and end is not None:
-            #     print(start,end)
-                        
-                
-                
-        # while i<len(self.raw_data):
-        #     word=self.raw_data[i]
-        #     start=i
-        #     for ky in KEYS:
-        #         if work.find(ky)>=0:
-        #             start=i+1
-        #             end=i+1
-        #             i+=1
-        #             while True:
-        #                 for ky2 in KEYS:
-        #                     if self.raw_data[i].find(ky2)>=0:
-        # #                         end=i
-        # #                         break
-                        
-        #         pass
-        #     i+=1
-        #     pass
-        for i,opt in enumerate(self.raw_data):
-            indexes[opt.replace("=","").strip()]=[i,None]
-            start_=False
-            for ky in self.__keys__:
-                if opt.find(ky)>=0:
-                    print(i,ky,opt)
-                    self.__dict__[ky].parse(opt)
-            pass
+        for opt,vals in indexes.items():
+            #print("BINGO",opt,vals)
+            tmp_opt=search_in(opt, KEYS)
+            self.__dict__[tmp_opt].parse(opt,vals)
         
         return self
+    def has_value(self,paramters={},**kwd):
+        STAT=[]
+        for case in [paramters,kwd]:
+            for ky,val in case.items():
+                act_ky=self._search_in(ky.lower(), self.__keys__.keys())
+                STAT+=[self.__dict__[act_ky].has_value(ky.lower(),val)]
+        return all(STAT)
+    
+    def __str__(self):
+        return "cell options representation has not been developed yet"
 
 
 if __name__=="__main__":
     copt = cell_options()
-    copt.parse(str_arr= ['u=', '101', 'imp:n=', '1'])
+    copt.parse(str_arr= ['u =', '101', "fill","2",'imp:n,p=1', '1','vol=',"2","lat","44","imp:e=","1"])
