@@ -64,6 +64,9 @@ class title:
     def parse(self,lines:list[str]):
         self.raw_data = lines
         self.value = lines[0]
+    
+    def __str__(self):
+        return self.value
         
 # ######################################################################
 class surface_card:

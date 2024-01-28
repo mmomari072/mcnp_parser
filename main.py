@@ -4,87 +4,17 @@ Created on Wed Jan 24 14:29:08 2024
 
 @author: mohammed.omari
 """
-from cellcard import cell_card
-from auxfuntions import *
+# from cellcard import cell_card
+# from auxfuntions import *
+from input_file import input_file
 
-class input_file:
-    def __init__(self):
-        self.filename = None
-        self.raw_txt = []
-        self.name=None
-        self.title = title()
-        self.cell_card = cell_card()
-        self.surface_card = surface_card()
-        self.maerial_card = []
-        self.options_card = options_card()
-        self.blocks_index = dict(
-            title=[0,1],
-            cell_card=[None,None],
-            surface_card=[None,None],
-            options_card=[None,None])
-    
-    def import_file(self,filename=None):
-        if filename is not None:
-            self.filename = filename
-        with open(self.filename,"r") as fid:
-            self.raw_txt = [l.strip("\n") for l in fid]
-        return self
-    
-    def find_blocks_index(self):
-        INDEX=[0,]
-        for i,txt in enumerate(self.raw_txt):
-            if i==0:
-                continue
-            if txt.strip()=='':
-                INDEX.append(i)
-                
-        print(INDEX)
-        #MAP = {0:"title",1:"cell_card",2:"surface_card",3:"options_card"}
-        for i,index in enumerate(INDEX[1:]):
-            #self.blocks_index[MAP[i]]=[index,]
-            pass
-        self.blocks_index["cell_card"]    = [1,INDEX[1]-1]
-        self.blocks_index["surface_card"] = [INDEX[1]+1,INDEX[2]-1]
-        self.blocks_index["options_card"] = [INDEX[2]+1,len(self.raw_txt)]
-        print(self.blocks_index)
-        return self
-    
-    def parsing_file_blocks(self):
-        #self.title = self.raw_txt[self.blocks_index["title"][0]]
-        for ky,Range in self.blocks_index.items():
-            print(ky,Range)
-            tmp_line = self.raw_txt[slice(*self.blocks_index[ky])]
-            self.__dict__[ky].parse(tmp_line)
-        return self
-            
-class title:
-    def __init__(self):
-        self.raw_data = []
-        self.value = None
-    def parse(self,lines:list[str]):
-        self.raw_data = lines
-        self.value = lines[0]
-        
-# ######################################################################
-class surface_card:
-    def __init__(self):
-        self.raw_data = []
-        self.value = None
-    def parse(self,lines):
-        self.raw_data = lines
-        #self.value = lines[0]
-    
-class options_card:
-    def __init__(self):
-        self.raw_data = []
-        self.value = None
-    def parse(self,lines=[str]):
-        self.raw_data = lines
-       
 
 if __name__=="__main__":
-    fname = r"G:\DATA_FUJITSU\Users\Mohammed\Desktop\Old & ongoing\JRTR_MCNP\JRTR_RPT_FullCore_InitialCore_for_JAEC-308K-MCNP.DAT"
-    fname = "../JRTR_RPT_FullCore_InitialCore_for_JAEC-308K-MCNP.DAT"
+    import sys
+    if sys.platform.find("win")>=0:
+        fname = r"G:\DATA_FUJITSU\Users\Mohammed\Desktop\Old & ongoing\JRTR_MCNP\JRTR_RPT_FullCore_InitialCore_for_JAEC-308K-MCNP_FOR_TESTING.DAT"
+    else:
+        fname = "../JRTR_RPT_FullCore_InitialCore_for_JAEC-308K-MCNP.DAT"
     I = input_file()
     I.import_file(fname)
     I.find_blocks_index()
@@ -92,12 +22,13 @@ if __name__=="__main__":
     
     for i,cell in I.cell_card.cells.items():
         if cell.options.u.value is not None:
-            print(i,cell.options.u.value)
+            #print(i,cell.options.u.value)
+            pass
             
     txt = """3654 2 -2.699 (-204:205:-116:117:-211:212)
               203 -206  115  -118  213 -214  u=114  imp:n=1"""
     from time import sleep
-    print(txt.split("\n"))
+    #print(txt.split("\n"))
     for line in I.cell_card.raw_data:
         #print(line)
         #sleep(0.01)
@@ -115,6 +46,26 @@ if __name__=="__main__":
         else:
             if cell.material_density not in MAT_ID[cell.material_id]:
                 MAT_ID[cell.material_id]+=[cell.material_density]
-            
+                
+    CELL_IDs = I.cell_card.look_for(u=102)
+    index = I.cell_card.look_for(fill=102)
+
+    FUEL_ASSEMBLEY = I.cell_card[index+CELL_IDs]
+    with open(r"G:\DATA_FUJITSU\Users\Mohammed\Documents\New folder (2)\MCNP_FUEL_ASSEMBLE_OMARI_EXTRACTED.DAT","w") as fid:
+        print(I.title,file=fid)
+        
+        for cell in FUEL_ASSEMBLEY:
+            #cell.options.u.value=None
+            #cell.material_id=0
+            #cell.material_density =None
+            for line in cell.export_mcnp():
+                print(line,file=fid)
+        print(f"0    0   #{index[0]} imp:n=0",file=fid)
+        print(file=fid)
+        for block in [I.surface_card,I.options_card]:
+            for line in block.raw_data:
+                print(line,file=fid)
+            print(file=fid)
+
 
         

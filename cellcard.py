@@ -33,7 +33,7 @@ class cell_card:
             # Return the related string list
             tmp_txt = self.raw_data[slice(start,end)]
             # Processing the 
-            print(tmp_txt)
+            #print(tmp_txt)
             tmp_cell = cell().parse(tmp_txt)
             self.cells[tmp_cell.id]=tmp_cell
         return self
@@ -96,8 +96,10 @@ class _general_option:
         elif self.key in ["vol","tmp"]:
             self.value = str2num(vals,conveter).convert()[0]
             pass
+        elif self.key is None:
+            pass
         else:
-            print(f"{self.key} hasn not been developed yet!")
+            print(f"{self.key} cell card option has not been developed yet!")
         return self.check()
     def check(self):
         return self
@@ -138,9 +140,9 @@ class _importance:
         super().__init__()
         self.key="imp"
     def parse(self,opt,val):
-        print(opt)
+        #print(opt)
         particles = opt.lower().split("imp:")[1].split(",")
-        print(particles)
+        #print(particles)
         if len(val)!=1:
             Warning("Warning in Importance option")
         for p in particles:
@@ -170,6 +172,14 @@ class _importance:
             return all(STAT)
         else:
             return False
+        
+    def __str__(self):
+        STR=""
+        for p in self._particles:
+            if p in self.__dict__:
+                STR+=f"imp:{p}={self.__getattribute__(p)} ".upper()
+        return STR .strip()
+                
                     
 
 class _volume(_general_option):
@@ -233,7 +243,7 @@ class cell:
         self.id = None
         self.material_id = None
         self.material_density = None
-        self.geomatery = None
+        self.geometry = cell_geomtery()
         self.GEOM = []
         self.options = cell_options()
         self.d_comments = []
@@ -295,7 +305,7 @@ class cell:
                 break
         # Process Geometry information
         self.GEOM = tmp[cell_i_start:cell_i_end+1]
-        
+        self.geometry.parse(self.GEOM)
         # Process options
         self.options.parse(tmp[cell_i_end+1:])
         
@@ -308,6 +318,17 @@ class cell:
     RHO      : {self.material_density}
     OPTIONS  : {str(self.options)}
     """
+    
+    def export_mcnp(self):
+        rho = f"{self.material_density:10.8g}" if self.material_id>0 else " "*10
+        first_words =f"{self.id:<5}  {self.material_id:<5} {rho} "
+        
+        LINES=pritty_str_arr(
+                   data=[first_words]+self.geometry.geo,tap_len=len(first_words),
+                   ).process()
+        #print(pritty_str_arr(data=[" "*len(first_words)]+self.options.export_mcnp())).process()
+        return LINES+pritty_str_arr(data=[" "*len(first_words)]+self.options.export_mcnp()).process()
+        
         
         
         
@@ -315,7 +336,97 @@ class cell:
 class cell_geomtery:
     def __init__(self):
         self.full_text = ""
+        self.raw_data=[]
+        self.geo = []
+    def parse(self,str_list:list[str]):
+        self.raw_data = str_list
+        def process_array(arr):
+            B=[]
+            
+            for item in arr:
+                for char in [":","(",")"]:
+                    item=item.replace(char,f" {char} ")
+                B+=[x for x in item.split() if x!='']
+            #print("This is B in process_array subfun",B)
+            return B
+        ITEMS=process_array(self.raw_data)
+
+        A=[]
+        for i,item in enumerate(ITEMS):
+            if item.find(":")==0:
+                A.append(OR())
+                continue
+            if item.find("#")>=0 and len(item)>1:
+                if isinstance(A[-1], OR):
+                    A+=[COMPLEMENT(item[1:])]
+                elif ~isinstance(A[-1], AND):
+                    A+=[AND(),COMPLEMENT(item[1:])]
+                else:
+                    Warning("CHECK THIS ONE!!")
+                continue
+            elif item.find("#")>=0:
+                Warning("CHECK # COMPLEMENT")
+            if i==0 or i==(len(ITEMS)-0):
+                A.append(item)
+                if i==(len(ITEMS)-1):
+                    break
+                continue
+            if isinstance(A[-1],(OR,)) or A[-1] in ["(",] or item in [")"]:
+                A.append(item)
+            # elif (i<len(ITEMS)-1 or True) and (ITEMS[i] in [")"]):
+            #     #print("BINGOOOOOOO",item,ITEMS[i+1])
+            #     A.append(item)
+            else:
+                A+=[AND(),item]
+            
+            #print(A)
+            
+        self.geo=A
+        return self
     
+    def __repr__(self):
+        STR=""
+        for l in pritty_str_arr(data=self.geo).process(include_first_line=True):
+            STR+=f"{l}\n"
+        
+        return STR
+    
+class _Bool_Operator:
+    def __init__(self):
+        self.str_char = " "
+        self.repr_char = " BOOL_OPERATOR "
+    def __repr__(self):
+        return self.repr_char
+    def __str__(self):
+        return self.str_char
+
+class AND(_Bool_Operator):
+    def __init__(self):
+        super().__init__()
+        self.str_char = " "
+        self.repr_char = "-AND-"
+        pass
+    
+class OR(_Bool_Operator):
+    def __init__(self):
+        self.str_char = ":"
+        self.repr_char = "-OR-"
+        pass
+    
+class COMPLEMENT(_Bool_Operator):
+    def __init__(self,cell_id):
+        self.str_char = "#"
+        self.repr_char = "-COMPLEMENT-"
+        self.cell_id = cell_id
+        pass
+    def __repr__(self):
+        return self.repr_char+f"{self.cell_id}"
+    def __str__(self):
+        return self.str_char+f"{self.cell_id}"
+    
+
+    
+
 from copy import deepcopy
 class cell_options:
     # *************************************************************************
@@ -330,11 +441,13 @@ class cell_options:
     
     
     __keys__ = cell_option_keys
-    
+    # *************************************************************************
     def __init__(self):
         for k,val in self.__keys__.items():
             self.__dict__[k]=deepcopy(val)
         self.raw_data = []
+        pass
+    
     def parse(self,str_arr=[str]):
         search_in =self._search_in
         def fix_array(x:list[str]):
@@ -373,6 +486,7 @@ class cell_options:
             self.__dict__[tmp_opt].parse(opt,vals)
         
         return self
+    
     def has_value(self,paramters={},**kwd):
         STAT=[]
         for case in [paramters,kwd]:
@@ -381,10 +495,22 @@ class cell_options:
                 STAT+=[self.__dict__[act_ky].has_value(ky.lower(),val)]
         return all(STAT)
     
+    def export_mcnp(self):
+        return [str(val) for k,val in self.__dict__.items() if (k in self.__keys__  and str(val)!='')]
+    
     def __str__(self):
         return "cell options representation has not been developed yet"
 
 
 if __name__=="__main__":
+
+    GG = ['(-204:205:-168:169:-211:212)', '203', '-206', '167', '-170', '213', '-214']
+#    process_array(GG)
+
+    cells = cell()
+    cells.geometry.parse(['201', '-208', '101', '-188', '325',":","1", '#-326'])
+    cells.geometry.parse(
+        ['(-204:205:-168:169:-211:212)', '203', '-206', '167', '-170', '213', '-214']
+        )
     copt = cell_options()
     copt.parse(str_arr= ['u =', '101', "fill","2",'imp:n,p=1', '1','vol=',"2","lat","44","imp:e=","1"])

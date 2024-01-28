@@ -1,0 +1,44 @@
+ mcnp     ver=5    , ld=11112005  01/28/24 13:36:24                   
+          Thread Name & Version = mcnp5VE_RSICC, 1.40
+          Copyright LANL/UC/DOE - see output file
+                                _                                      
+          ._ _    _  ._   ._   |_                                      
+          | | |  (_  | |  |_)   _)                                     
+                          |                                            
+  
+ 601    s   0.0   0.0  36.1  1.9                                      
+ warning. this surface has been replaced by a surface of type sz 
+ 602    s   0.0   0.0  20.1  1.9                                      
+ warning. this surface has been replaced by a surface of type sz 
+ 603    s   0.0   0.0   4.1  1.9                                      
+ warning. this surface has been replaced by a surface of type sz 
+ 604    s   0.0   0.0 -11.9  1.9                                      
+ warning. this surface has been replaced by a surface of type sz 
+ 605    s   0.0   0.0 -26.8  1.9                                      
+ warning. this surface has been replaced by a surface of type sz 
+ 9652  p     0.00000000   1.  0.  -0.35000000                         
+ warning. this surface has been replaced by a surface of type py 
+ 9653  p     0.00000000   1.  0.   0.35000000                         
+ warning. this surface has been replaced by a surface of type py 
+ 9658  p     1.           0.  0.   0.92500000                         
+ warning. this surface has been replaced by a surface of type px 
+ 9661  p     1.           0.  0.  -0.92500000                         
+ warning. this surface has been replaced by a surface of type px 
+ f54:n 961 962 963 964 965 966                                        
+ fatal error.  f card cell   961 of bin   1 tally    54 not found.
+ fatal error.  f card cell   962 of bin   2 tally    54 not found.
+ fatal error.  f card cell   963 of bin   3 tally    54 not found.
+ fatal error.  f card cell   964 of bin   4 tally    54 not found.
+ fatal error.  f card cell   965 of bin   5 tally    54 not found.
+ fatal error.  f card cell   966 of bin   6 tally    54 not found.
+ m1001 92234.25c     -1.3397E-03                                      
+ warning. material1001 is not used in the problem.
+ m1003 92234.25c   -9.9000E-04                                        
+ warning. material1003 is not used in the problem.
+ m1004 92234.25c     -8.2310E-04                                      
+ warning. material1004 is not used in the problem.
+ m22   13027.25c    -9.735E-01                                        
+ warning. material  22 is not used in the problem.
+ m4     40090.25c    -0.498130883                                     
+ warning. material   4 is not used in the problem.
+ additional error messages on file outp    
